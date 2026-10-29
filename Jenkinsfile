@@ -2,18 +2,13 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'week12-app'
-        DOCKERHUB_USER = 'khyathig'
-        DEPLOYMENT_NAME = 'week12-deployment'
-        DOCKER_PATH = 'C:\\Users\\khyat\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin'
+        PATH = "C:\\Users\\khyat\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin;${env.PATH}"
     }
 
     stages {
-
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
                 checkout scm
-                echo 'Source code checked out successfully.'
             }
         }
 
@@ -23,7 +18,7 @@ pipeline {
             }
         }
 
-        stage('Run Selenium Tests with Pytest') {
+        stage('Run Selenium Tests') {
             steps {
                 bat '''
                     start /B python app.py
@@ -35,57 +30,30 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                bat '''
-                    set "PATH=%DOCKER_PATH%;%PATH%"
-                    docker --version
-                    docker build -t %IMAGE_NAME%:latest .
-                '''
-                echo 'Docker image built successfully.'
+                echo 'Build Docker Image'
+                bat 'docker build -t week12-app:latest .'
             }
         }
 
         stage('Docker Login') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'docker-credentials',
-                        usernameVariable: 'DOCKERHUB_USER_CREDENTIAL',
-                        passwordVariable: 'DOCKERHUB_TOKEN'
-                    )
-                ]) {
-                    bat '''
-                        set "PATH=%DOCKER_PATH%;%PATH%"
-                        echo %DOCKERHUB_TOKEN% | docker login -u "%DOCKERHUB_USER_CREDENTIAL%" --password-stdin
-                    '''
-                }
+                bat 'docker login -u khyathig -p Docker@123'
             }
         }
 
         stage('Push Docker Image to Docker Hub') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'docker-credentials',
-                        usernameVariable: 'DOCKERHUB_USER_CREDENTIAL',
-                        passwordVariable: 'DOCKERHUB_TOKEN'
-                    )
-                ]) {
-                    bat '''
-                        set "PATH=%DOCKER_PATH%;%PATH%"
-                        docker tag %IMAGE_NAME%:latest "%DOCKERHUB_USER_CREDENTIAL%/%IMAGE_NAME%:latest"
-                        docker push "%DOCKERHUB_USER_CREDENTIAL%/%IMAGE_NAME%:latest"
-                    '''
-                }
+                echo 'Push Docker Image to Docker Hub'
+                bat 'docker tag week12-app:latest khyathig/week12-app:latest'
+                bat 'docker push khyathig/week12-app:latest'
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                bat '''
-                    kubectl apply -f deployment.yaml
-                    kubectl apply -f service.yaml
-                    kubectl rollout status deployment/%DEPLOYMENT_NAME% --timeout=120s
-                '''
+                bat 'kubectl apply -f deployment.yaml'
+                bat 'kubectl apply -f service.yaml'
+                bat 'kubectl rollout status deployment/week12-deployment --timeout=120s'
             }
         }
 
@@ -100,15 +68,11 @@ pipeline {
 
     post {
         success {
-            echo 'Week 12 CI/CD pipeline completed successfully!'
+            echo 'Pipeline completed successfully!'
         }
 
         failure {
-            echo 'Pipeline failed. Check the Jenkins Console Output for details.'
-        }
-
-        always {
-            echo 'Week 12 pipeline execution finished.'
+            echo 'Pipeline failed. Please check the logs.'
         }
     }
 }
